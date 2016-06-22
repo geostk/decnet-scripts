@@ -2,7 +2,7 @@
 
 import numpy as np
 import sys
-sys.path.append('./caffe/python')
+sys.path.insert(0, './caffe/python')
 import caffe
 from PIL import Image
 from caffe.proto import caffe_pb2
@@ -13,6 +13,7 @@ def init( proto = None, weight = None, use_gpu = True, gpuid = 0 ):
         proto = 'model/DecoupledNet_Full_anno/DecoupledNet_Full_anno_inference_deploy.prototxt'
     if weight is None:
         weight = 'model/DecoupledNet_Full_anno/DecoupledNet_Full_anno_inference.caffemodel'
+    print('Caffe with proto=%s and weight=%s' %(proto, weight))
     net = caffe.Net(proto, weight)
     if use_gpu:
         net.set_mode_gpu()
