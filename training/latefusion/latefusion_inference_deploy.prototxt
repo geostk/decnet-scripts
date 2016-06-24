@@ -1,61 +1,22 @@
-name: "latefusion_simplefeatures"
+name: "latefusion_inference_deploy"
 
-layers {
-  name: "data"
-  type: SELECT_SEG_BINARY_TWO_FRAMES
-  top: "data"
-  top: "data2"
-  top: "seg-label"
-  top: "cls-label"
-  image_data_param {
-    root_folder: "./dataset"
-    source: "./dataset/train.txt"
-    label_type: PIXEL
-    batch_size: 4
-    shuffle: true
-    new_width: 350
-    new_height: 350
-  }
-  transform_param {
-    mean_value: 104.008
-    mean_value: 116.669
-    mean_value: 122.675
-    crop_size: 320
-    mirror: true
-  }
-  window_cls_data_param {
-    label_dim: 20
-  }
-  include: { phase: TRAIN }
-}
-layers {
-  name: "data"
-  type: SELECT_SEG_BINARY_TWO_FRAMES
-  top: "data"
-  top: "data2"
-  top: "seg-label"
-  top: "cls-label"
-  image_data_param {
-    root_folder: "./dataset"
-    source: "./dataset/val.txt"
-    label_type: PIXEL
-    batch_size: 2
-    shuffle: true
-    new_width: 350
-    new_height: 350
-  }
-  transform_param {
-    mean_value: 104.008
-    mean_value: 116.669
-    mean_value: 122.675
-    crop_size: 320
-    mirror: true
-  }
-  window_cls_data_param {
-    label_dim: 20
-  }
-  include: { phase: TEST }
-}
+input: "data"
+input_dim: 1
+input_dim: 3
+input_dim: 320
+input_dim: 320
+
+input: "data2"
+input_dim: 1
+input_dim: 3
+input_dim: 320
+input_dim: 320
+
+input: "cls-score-masked"
+input_dim: 1
+input_dim: 20
+input_dim: 1
+input_dim: 1
 
 ###############################################################################
 ##### Conv1 ###################################################################
@@ -307,6 +268,13 @@ layers { name: 'cls-score-voc' type: CONVOLUTION bottom: 'fc7' top: 'cls-score'
 
 # average pooling
 layers {
+  bottom: "cls-score"  top: "cls-score-avg-pooled" name: "avg-pool"  type: POOLING
+  pooling_param {    pool: AVE    kernel_size: 4    stride: 1  }
+}
+layers { bottom: 'cls-score-avg-pooled' top: 'cls-score-avg-sigmoid' name: 'cls-score-sigmoid' type: SIGMOID}
+
+# average pooling
+layers {
   bottom: "cls-score"  top: "cls-score-pooled" top: "score-pool-mask" name: "avg-pool"  type: POOLING
   pooling_param {    pool: MAX    kernel_size: 4    stride: 1  }
 }
@@ -355,7 +323,7 @@ layers { bottom: 'fc6-bp' top: 'pool5-bp' name: 'fc6-bp' type: DECONVOLUTION
 ### apply bn to pool5 feature
 layers { bottom: 'pool5' top: 'pool5-bn' name: 'pool5-bn' type: BN
   bn_param { scale_filler { type: 'constant' value: 1 }
-             shift_filler { type: 'constant' value: 0.001 } } }
+             shift_filler { type: 'constant' value: 2.001 } } }
 
 ### apply bn to pool5 feature
 layers { bottom: 'pool5b' top: 'pool5b-bn' name: 'pool5b-bn' type: BN
@@ -396,11 +364,9 @@ layers { bottom: 'fc7-seg' top: 'fc7-seg' name: 'bnfc7-seg' type: BN
              shift_filler { type: 'constant' value: 0.001 } } }
 layers {  bottom: "fc7-seg"  top: "fc7-seg"  name: "relu7-seg"  type: RELU}
 
-
 ###############################################################################
 ##### Deconvolution ###########################################################
 ###############################################################################
-
 
 # fc6-deconv
 layers { bottom: 'fc7-seg' top: 'fc6-deconv' name: 'fc6-deconv' type: DECONVOLUTION
@@ -556,6 +522,7 @@ layers { bottom: 'deconv2_2' top: 'deconv2_2' name: 'derelu2_2' type: RELU }
 layers { type: UNPOOLING  bottom: "deconv2_2"  bottom: "pool1_mask"  top: "unpool1"  name: "unpool1"
   unpooling_param {   unpool: MAX   kernel_size: 2    stride: 2   unpool_size: 320 }
 }
+
 # deconv1_1
 layers { bottom: 'unpool1' top: 'deconv1_1' name: 'deconv1_1' type: DECONVOLUTION
   blobs_lr: 1 blobs_lr: 2 weight_decay: 1 weight_decay: 0
@@ -584,31 +551,6 @@ layers { name: 'seg-score-voc' type: CONVOLUTION bottom: 'deconv1_2' top: 'seg-s
   convolution_param { num_output: 2 kernel_size: 1
     weight_filler {      type: "gaussian"      std: 0.01    }
     bias_filler {      type: "constant"      value: 0    }} }
-
-# score and accuracy
-layers {
-  name: "seg-accuracy"
-  type: ELTWISE_ACCURACY
-  bottom: "seg-score"
-  bottom: "seg-label"
-  top: "seg-accuracy"
-  eltwise_accuracy_param {
-    ignore_label: 255
-  }
-  include: { phase: TEST }
-}
-
-layers {
-  name: "seg-loss"
-  type: SOFTMAX_LOSS
-  bottom: "seg-score"
-  bottom: "seg-label"
-  top: "seg-loss"
-  loss_param {
-    ignore_label: 255
-  }
-}
-
 
 
 
