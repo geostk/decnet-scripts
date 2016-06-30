@@ -1,4 +1,4 @@
-name: "latefusion_simplefeatures"
+name: "latefusion_fullfeatures"
 
 layers {
   name: "data"
@@ -28,6 +28,7 @@ layers {
   }
   include: { phase: TRAIN }
 }
+
 layers {
   name: "data"
   type: SELECT_SEG_BINARY_TWO_FRAMES
@@ -282,25 +283,25 @@ layers {
 ###############################################################################
 ##### Classification ##########################################################
 ###############################################################################
-# Done only for the first convolution stream
+# for first convolution stream
 
 # 7 x 7
 # fc6
 layers { bottom: 'pool5' top: 'fc6' name: 'fc6' type: CONVOLUTION
-  blobs_lr: 0 blobs_lr: 0 weight_decay: 1 weight_decay: 0
+  blobs_lr: 0 blobs_lr: 0 weight_decay: 1 weight_decay: 0 param: 'fc6p1' param: 'fc6p2'
   convolution_param { kernel_size: 7 num_output: 4096 } }
 layers {  bottom: "fc6"  top: "fc6" top: "relu6-mask"  name: "relu6"  type: RELU}
 
 # 1 x 1
 # fc7
 layers { bottom: 'fc6' top: 'fc7' name: 'fc7' type: CONVOLUTION
-  blobs_lr: 0 blobs_lr: 0 weight_decay: 1 weight_decay: 0
+  blobs_lr: 0 blobs_lr: 0 weight_decay: 1 weight_decay: 0 param: 'fc7p1' param: 'fc7p2'
   convolution_param { kernel_size: 1 num_output: 4096 } }
 layers {  bottom: "fc7"  top: "fc7" top: "relu7-mask"  name: "relu7"  type: RELU}            
 
 # cls-score-voc
 layers { name: 'cls-score-voc' type: CONVOLUTION bottom: 'fc7' top: 'cls-score'
-  blobs_lr: 0 blobs_lr: 0 weight_decay: 1 weight_decay: 0
+  blobs_lr: 0 blobs_lr: 0 weight_decay: 1 weight_decay: 0 param: 'cls-score-p1' param: 'cls-score-p2'
   convolution_param { num_output: 20 kernel_size: 1
     weight_filler {      type: "gaussian"      std: 0.01    }
     bias_filler {      type: "constant"      value: 0    }} }
@@ -326,7 +327,7 @@ layers {
 # 1 x 1
 # cls-score-voc-bp
 layers { name: 'cls-score-voc-bp' type: CONVOLUTION bottom: 'cls-score-unpooled' top: 'fc7-bp'
-  blobs_lr: 0 blobs_lr: 0 weight_decay: 1 weight_decay: 0
+  blobs_lr: 0 blobs_lr: 0 weight_decay: 1 weight_decay: 0 param: 'cls-score-bp-p1' param: 'cls-score-bp-p2'
   convolution_param { num_output: 4096 kernel_size: 1
     weight_filler {      type: "gaussian"      std: 0.01    }
     bias_filler {      type: "constant"      value: 0    }} }
@@ -336,14 +337,78 @@ layers { name: 'cls-score-voc-bp' type: CONVOLUTION bottom: 'cls-score-unpooled'
 layers { bottom: 'fc7-bp' bottom: 'relu7-mask' top: 'fc7-bp' name: 'relu7-mask' type: ELTWISE
   eltwise_param { operation: PROD }}
 layers { bottom: 'fc7-bp' top: 'fc6-bp' name: 'fc7-bp' type: DECONVOLUTION
-  blobs_lr: 0 blobs_lr: 0 weight_decay: 1 weight_decay: 0
+  blobs_lr: 0 blobs_lr: 0 weight_decay: 1 weight_decay: 0 param: 'fc7-bp-p1' param: 'fc7-bp-p2'
   convolution_param { kernel_size: 1 num_output: 4096 } }
 
 # fc6-bp
 layers { bottom: 'fc6-bp' bottom: 'relu6-mask' top: 'fc6-bp' name: 'relu6-mask' type: ELTWISE
   eltwise_param { operation: PROD }}
 layers { bottom: 'fc6-bp' top: 'pool5-bp' name: 'fc6-bp' type: DECONVOLUTION
-  blobs_lr: 0 blobs_lr: 0 weight_decay: 1 weight_decay: 0
+  blobs_lr: 0 blobs_lr: 0 weight_decay: 1 weight_decay: 0 param: 'fc6-bp-p1' param: 'fc6-bp-p2'
+  convolution_param { kernel_size: 7 num_output: 512 } }
+
+# for second convolution stream
+
+# 7 x 7
+# fc6
+layers { bottom: 'pool5b' top: 'fc6b' name: 'fc6b' type: CONVOLUTION
+  blobs_lr: 0 blobs_lr: 0 weight_decay: 1 weight_decay: 0 param: 'fc6p1' param: 'fc6p2'
+  convolution_param { kernel_size: 7 num_output: 4096 } }
+layers {  bottom: "fc6b"  top: "fc6b" top: "relu6b-mask"  name: "relu6b"  type: RELU}
+
+# 1 x 1
+# fc7
+layers { bottom: 'fc6b' top: 'fc7b' name: 'fc7b' type: CONVOLUTION
+  blobs_lr: 0 blobs_lr: 0 weight_decay: 1 weight_decay: 0 param: 'fc7p1' param: 'fc7p2'
+  convolution_param { kernel_size: 1 num_output: 4096 } }
+layers {  bottom: "fc7b"  top: "fc7b" top: "relu7b-mask"  name: "relu7b"  type: RELU}            
+
+# cls-score-voc
+layers { name: 'cls-score-vocb' type: CONVOLUTION bottom: 'fc7b' top: 'cls-scoreb'
+  blobs_lr: 0 blobs_lr: 0 weight_decay: 1 weight_decay: 0 param: 'cls-score-p1' param: 'cls-score-p2'
+  convolution_param { num_output: 20 kernel_size: 1
+    weight_filler {      type: "gaussian"      std: 0.01    }
+    bias_filler {      type: "constant"      value: 0    }} }
+
+# average pooling
+layers {
+  bottom: "cls-scoreb"  top: "cls-scoreb-pooled" top: "score-poolb-mask" name: "avg-poolb"  type: POOLING
+  pooling_param {    pool: MAX    kernel_size: 4    stride: 1  }
+}
+layers { bottom: 'cls-scoreb-pooled' top: 'cls-scoreb-sigmoid' name: 'cls-scoreb-sigmoid' type: SIGMOID}
+
+# mask score using class label
+layers { bottom: 'cls-scoreb-sigmoid' bottom: 'cls-label' top: 'cls-scoreb-masked' name: 'cls-scoreb-mask' type: ELTWISE
+  eltwise_param { operation: PROD }}
+
+# average unpooling
+layers {
+  bottom: "cls-scoreb-masked" bottom: "score-poolb-mask"  top: "cls-scoreb-unpooled" 
+  name: "avg-unpoolb"  type: UNPOOLING
+  unpooling_param {    unpool: MAX    kernel_size: 4    stride: 1 unpool_size: 4  }
+}
+
+# 1 x 1
+# cls-score-voc-bp
+layers { name: 'cls-score-vocb-bp' type: CONVOLUTION bottom: 'cls-scoreb-unpooled' top: 'fc7b-bp'
+  blobs_lr: 0 blobs_lr: 0 weight_decay: 1 weight_decay: 0 param: 'cls-score-bp-p1' param: 'cls-score-bp-p2'
+  convolution_param { num_output: 4096 kernel_size: 1
+    weight_filler {      type: "gaussian"      std: 0.01    }
+    bias_filler {      type: "constant"      value: 0    }} }
+
+
+# fc7-bp
+layers { bottom: 'fc7b-bp' bottom: 'relu7b-mask' top: 'fc7b-bp' name: 'relu7b-mask' type: ELTWISE
+  eltwise_param { operation: PROD }}
+layers { bottom: 'fc7b-bp' top: 'fc6b-bp' name: 'fc7b-bp' type: DECONVOLUTION
+  blobs_lr: 0 blobs_lr: 0 weight_decay: 1 weight_decay: 0 param: 'fc7-bp-p1' param: 'fc7-bp-p2'
+  convolution_param { kernel_size: 1 num_output: 4096 } }
+
+# fc6-bp
+layers { bottom: 'fc6b-bp' bottom: 'relu6b-mask' top: 'fc6b-bp' name: 'relu6b-mask' type: ELTWISE
+  eltwise_param { operation: PROD }}
+layers { bottom: 'fc6b-bp' top: 'pool5b-bp' name: 'fc6b-bp' type: DECONVOLUTION
+  blobs_lr: 0 blobs_lr: 0 weight_decay: 1 weight_decay: 0 param: 'fc6-bp-p1' param: 'fc6-bp-p2'
   convolution_param { kernel_size: 7 num_output: 512 } }
 
 
@@ -367,8 +432,13 @@ layers { bottom: 'pool5-bp' top: 'pool5-bp-bn' name: 'pool5-bp-bn' type: BN
   bn_param { scale_filler { type: 'constant' value: 1 }
              shift_filler { type: 'constant' value: 0.001 } } }
 
+### apply bn to pool5-bp feature
+layers { bottom: 'pool5b-bp' top: 'pool5b-bp-bn' name: 'pool5b-bp-bn' type: BN
+  bn_param { scale_filler { type: 'constant' value: 1 }
+             shift_filler { type: 'constant' value: 0.001 } } }
+
 ### concatenate pool5, pool5b and pool5-bp feature (after bn)
-layers { bottom: 'pool5-bn' bottom: 'pool5b-bn' bottom: 'pool5-bp-bn' top: 'pool5-concat'
+layers { bottom: 'pool5-bn' bottom: 'pool5b-bn' bottom: 'pool5-bp-bn' bottom: 'pool5b-bp-bn' top: 'pool5-concat'
          name: 'pool5-concat' type: CONCAT }
 
 ### learning how to mix features

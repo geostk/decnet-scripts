@@ -2,7 +2,7 @@
 
 import numpy as np
 import sys
-sys.path.append('./caffe/python')
+sys.path.insert(0, './caffe/python')
 import caffe
 from PIL import Image
 from caffe.proto import caffe_pb2
@@ -13,6 +13,7 @@ def init( proto = None, weight = None, use_gpu = True, gpuid = 0 ):
         proto = 'model/DecoupledNet_Full_anno/DecoupledNet_Full_anno_inference_deploy.prototxt'
     if weight is None:
         weight = 'model/DecoupledNet_Full_anno/DecoupledNet_Full_anno_inference.caffemodel'
+    print('Caffe with proto=%s and weight=%s' %(proto, weight))
     net = caffe.Net(proto, weight)
     if use_gpu:
         net.set_mode_gpu()
@@ -32,21 +33,25 @@ def preprocess( img, ref_sz ):
 
 def process( net, inp_file, out_file, ref_size = 320 ):
     im = cv2.imread(inp_file)
-    out,_ = segment(net, im, ref_size)
+    out,_ = segment(net, im, ref_size = ref_size)
     cv2.imwrite(out_file, (out * 255).astype(np.uint8))
     return out
 
-def segment( net, img, ref_size = 320 ):
+def process2( net, in1_file, in2_file, out_file, ref_size = 320):
+    im1 = cv2.imread(in1_file)
+    im2 = cv2.imread(in2_file)
+    out,_ = segment(net, im1, im2, ref_size = ref_size)
+    cv2.imwrite(out_file, (out * 255).astype(np.uint8))
+    return out
+
+def segment( net, img, img2 = None, ref_size = 320 ):
     img = np.array(img, dtype=float)
     h, w, ch = img.shape
     
     # pad image to be square
     im_sz = max(h, w)
     caffe_im = np.lib.pad(img, [(0, im_sz - h), (0, im_sz - w), (0, 0)], 'constant', constant_values = 0)
-    # caffe_im = padarray(img, [im_sz - h, im_sz - w], 'post')
     caffe_im = preprocess(caffe_im, ref_size)
-    # conversion to [1, 3, h, w] format
-    # XXX is it [1,3,h,w] or [1,3,w,h]
     caffe_im = np.transpose(caffe_im, [2, 0, 1])
     caffe_im = caffe_im[np.newaxis, :, :, :]
 
@@ -56,6 +61,13 @@ def segment( net, img, ref_size = 320 ):
     
     # compute background and classification
     net.blobs['data'].data[...] = caffe_im
+    if img2 is not None:
+        img2 = np.array(img2, dtype=float)
+        caffe_im2 = np.lib.pad(img2, [(0, im_sz - h), (0, im_sz - w), (0, 0)], 'constant', constant_values = 0)
+        caffe_im2 = preprocess(caffe_im2, ref_size)
+        caffe_im2 = np.transpose(caffe_im2, [2, 0, 1])
+        caffe_im2 = caffe_im2[np.newaxis, :, :, :]
+        net.blobs['data2'].data[...] = caffe_im2
     net.blobs['cls-score-masked'].data[...] = label
     net.forward()
     
