@@ -18,15 +18,12 @@ for model in $model_dir/**/*.caffemodel; do
   output_dir="$base_output_dir/$model_name"
   mkdir -p "$output_dir/next" 2>/dev/null
   read -r -d '' SCRIPT << EOM
-decnet_init('$proto', '$model', 1);
+decnet_init('$proto', '$model', 0);
 files=dir('$input_next_dir');
 for i = 1:numel(files),
     if files(i).isdir, continue; end;
     [~, name, ext] = fileparts(files(i).name);
     fprintf('[%d of %d] %s\n', i, numel(files), files(i).name);
-    I = imread(fullfile('$input_dir', files(i).name));
-    S = decnet_segment(I);
-    imwrite(S, fullfile('$output_dir', files(i).name));
     I = imread(fullfile('$input_next_dir', files(i).name));
     S = decnet_segment(I);
     imwrite(S, fullfile('$output_dir', 'next', files(i).name));

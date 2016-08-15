@@ -1,0 +1,119 @@
+name: "soccer"
+
+layers {
+  name: "data"
+  type: SELECT_SEG_BINARY_TWO_FRAMES
+  top: "data"
+  top: "data2"
+  top: "seg-label"
+  image_data_param {
+    root_folder: "./dataset"
+    source: "./dataset/train.txt"
+    label_type: PIXEL
+    batch_size: 4
+    shuffle: true
+    new_width: 350
+    new_height: 350
+    is_color: false
+  }
+  transform_param {
+    crop_size: 320
+    mirror: true
+  }
+  window_cls_data_param {
+    label_dim: 20
+  }
+  include: { phase: TRAIN }
+}
+layers {
+  name: "data"
+  type: SELECT_SEG_BINARY_TWO_FRAMES
+  top: "data"
+  top: "data2"
+  top: "seg-label"
+  image_data_param {
+    root_folder: "./dataset"
+    source: "./dataset/val.txt"
+    label_type: PIXEL
+    batch_size: 2
+    shuffle: true
+    new_width: 350
+    new_height: 350
+    is_color: false
+  }
+  transform_param {
+    crop_size: 320
+    mirror: true
+  }
+  window_cls_data_param {
+    label_dim: 20
+  }
+  include: { phase: TEST }
+}
+
+### concat inputs
+layers { bottom: 'data' bottom: 'data2' top: 'input'
+         name: 'input-concat' type: CONCAT }
+
+### convolutions
+layers { bottom: "input" top: "conv1" name: "conv1" type: CONVOLUTION
+  blobs_lr: 1 blobs_lr: 2 weight_decay: 1 weight_decay: 0
+  convolution_param {   num_output: 32    pad: 1    kernel_size: 3
+    weight_filler {     type: "gaussian"      std: 0.01    }
+    bias_filler {       type: "constant"      value: 0    } } }
+layers { bottom: "conv1" top: "conv1" name: "conv1-bn" type: BN
+  bn_param { scale_filler { type: 'constant' value: 1 }
+             shift_filler { type: 'constant' value: 0.001 } } }
+layers {  bottom: "conv1"  top: "conv1"  name: "conv1-relu"  type: RELU }
+         
+layers { bottom: "conv1" top: "conv2" name: "conv2" type: CONVOLUTION
+  blobs_lr: 1 blobs_lr: 2 weight_decay: 1 weight_decay: 0
+  convolution_param {   num_output: 32    pad: 1    kernel_size: 3
+    weight_filler {     type: "gaussian"      std: 0.01    }
+    bias_filler {       type: "constant"      value: 0    } } }
+layers { bottom: "conv2" top: "conv2" name: "conv2-bn" type: BN
+  bn_param { scale_filler { type: 'constant' value: 1 }
+             shift_filler { type: 'constant' value: 0.001 } } }
+layers {  bottom: "conv2"  top: "conv2"  name: "conv2-relu"  type: RELU }
+
+layers { bottom: "conv2" top: "conv3" name: "conv3" type: CONVOLUTION
+  blobs_lr: 1 blobs_lr: 2 weight_decay: 1 weight_decay: 0
+  convolution_param {   num_output: 32    pad: 1    kernel_size: 3
+    weight_filler {     type: "gaussian"      std: 0.01    }
+    bias_filler {       type: "constant"      value: 0    } } }
+layers { bottom: "conv3" top: "conv3" name: "conv3-bn" type: BN
+  bn_param { scale_filler { type: 'constant' value: 1 }
+             shift_filler { type: 'constant' value: 0.001 } } }
+layers {  bottom: "conv3"  top: "conv3"  name: "conv3-relu"  type: RELU }
+
+# merging convolution
+layers { name: 'merging' type: CONVOLUTION bottom: 'conv3' top: 'merged'
+  blobs_lr: 1 blobs_lr: 2 weight_decay: 1 weight_decay: 0
+  convolution_param { num_output: 1 kernel_size: 1
+    weight_filler {      type: "gaussian"      std: 0.01    }
+    bias_filler {      type: "constant"      value: 0    }} }
+
+# residual score
+layers {  bottom: "merged" bottom: "data" top: "residual" name: "residual" type: ELTWISE
+  eltwise_param { operation: SUM } }
+
+# score and accuracy
+
+layers {  name: "one" bottom: "seg-label" top: "one" type: THRESHOLD
+  threshold_param { threshold: -1 } } # full 1 layer since the labels are positive
+layers {  name: "neg-score" bottom: "residual" bottom: "one" top: "neg-score" type: ELTWISE
+  eltwise_param { operation: SUM coeff: -1 coeff: 1 } }
+layers {  name: "seg-score" bottom: "residual" bottom: "neg-score" top: "seg-score" type: CONCAT }
+
+layers {
+  name: "seg-loss"
+  type: SOFTMAX_LOSS
+  bottom: "seg-score"
+  bottom: "seg-label"
+  top: "seg-loss"
+  loss_param {
+    ignore_label: 255
+  }
+}
+
+
